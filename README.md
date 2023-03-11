@@ -35,6 +35,24 @@ Different models require different MP values:
 | 33B    | 4  |
 | 65B    | 8  |
 
+## Discord BOT
+
+This fork of Meta's llama code has a discord bot.
+First you need to create a discord bot:
+
+ 1. Turn on “Developer mode” in your Discord account.
+ 2. Click on “Discord API”.
+ 3. In the Developer portal, click on “Applications”. ...
+ 4. Name the bot and then click “Create”.
+ 5. Go to the “Bot” menu and generate a token using “Add Bot”.
+ 6. Generate and copy your token. You need to insert this token in the 'discordtoken.txt' file
+
+After this, you run the bot with the 'runbod.sh' command, or in this way:
+
+    torchrun --nproc_per_node 2 bot.py --ckpt_dir data/13B --tokenizer_path .data/tokenizer.model
+
+This will launch the bot using 2XRTX3090 and the 13B model. For different models, adjust the proc_per_node variable (1 for 7B, 2 for 13B, 4 for 30B and 8 for 65B)
+
 ## FAQ
 
 - [1. The download.sh script doesn't work on default bash in MacOS X](FAQ.md#1)
