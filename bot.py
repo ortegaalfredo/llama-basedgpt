@@ -1,7 +1,7 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands,tasks
 from typing import Tuple
-import os,re,argparse
+import os,re,argparse,asyncio
 import sys
 import torch
 import time
@@ -81,6 +81,19 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", help_command=None,intents=intents)
 
+
+# The message queue
+msgqueue=[]
+
+@tasks.loop(seconds=2)
+async def thread_reply():
+        global msgqueue
+        await bot.change_presence(activity=discord.Game(name='Queue: %d'% len(msgqueue)))
+        if len(msgqueue)>0:
+            message=msgqueue.pop(0)
+            await answerMessage(message)
+            await asyncio.sleep(2)
+
 @bot.command()
 async def info(ctx):
     print('info')
@@ -93,11 +106,20 @@ async def on_ready() -> None:
     print(msg)
     log(msg)
     await bot.change_presence(activity=discord.Game(name="global thermonuclear war")) 
+    thread_reply.start()
 
-sem = 0 # global semaphore
 
 @bot.event
 async def on_message(message):
+    global msgqueue
+    if message.author == bot.user:
+        return
+    botid=("<@%d>" % bot.user.id)
+    if message.content.startswith(botid):
+        msgqueue.append(message)
+
+
+async def answerMessage(message):
     #Default config values
     temperature= 0.9
     top_p= 0.75
@@ -105,14 +127,9 @@ async def on_message(message):
     repetition_penalty_range=1024
     repetition_penalty=1.15
     repetition_penalty_slope=0.7
-    #semaphore
-    global sem
     if message.author == bot.user:
         return
 
-    if (sem==1):
-        time.sleep(5)
-    sem=1
     local_rank = int(os.environ.get("LOCAL_RANK", -1))
     botid=("<@%d>" % bot.user.id)
     if message.content.startswith(botid):
@@ -146,7 +163,6 @@ async def on_message(message):
                     msg = f"{message.author.mention} Error parsing the Json config: %s" % str(e)
                     log(msg)
                     await message.channel.send(msg)
-                sem=0
                 return
 
         if (query.startswith('raw ')): # Raw prompt
@@ -162,10 +178,8 @@ async def on_message(message):
             except: 
                 if local_rank == 0:
                     await message.channel.send(msg)
-                sem=0
                 return
         if local_rank == 0:
-            sem=0
             return
         log("---"+str(origquery))
 
@@ -177,7 +191,6 @@ async def on_message(message):
                     await message.channel.send(msg[i:i+1500])
             else:
                 await message.channel.send(msg)
-    sem=0
 
 #Argument parser
 parser = argparse.ArgumentParser(description='BasedGPT AI discord chat, (C) Cybergaucho 2023 @ortegaalfredo')
